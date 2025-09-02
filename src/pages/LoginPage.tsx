@@ -181,7 +181,7 @@ export const LoginPage: React.FC = () => {
                 onClick={handleLogin}
                 disabled={isLoading}
                 size="lg"
-                className="w-full bg-gradient-to-r from-primary to-primary-glow hhthyhtyhover:from-primary-glow hover:to-primary"
+                className="w-full bg-gradient-to-r from-primary to-primary-glow hover:from-primary-glow hover:to-primary"
               >
                 {isLoading ? (
                   <motion.div
