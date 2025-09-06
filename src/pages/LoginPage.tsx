@@ -1,216 +1,186 @@
-import React, { useState } from 'react'
-import { motion } from 'motion/react'
-import { useNavigate } from 'react-router-dom'
-import { Button } from '@/components/ui/button'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Gamepad2, Sparkles, Users, MessageCircle } from 'lucide-react'
-import { authApi } from '@/utils/api'
-import { useAuthStore } from '@/store/UseAuthStore'
+import React, { useState, useEffect } from 'react'
+import { useChat } from '../contexts/ChatContext'
+import { Button } from '../components/ui/button'
+import { Input } from '../components/ui/input'
+import { Card } from '../components/ui/card'
 import { toast } from 'sonner'
 
+const AVATARS = ['😄', '🚀', '🌟', '🎉', '💫', '🔥', '⚡', '🎯', '🎨', '🎭', '🎪', '🎸']
+
 export const LoginPage: React.FC = () => {
+  const { setupUser, state } = useChat()
+  const [username, setUsername] = useState('')
+  const [selectedAvatar, setSelectedAvatar] = useState(AVATARS[0])
   const [isLoading, setIsLoading] = useState(false)
-  const navigate = useNavigate()
-  const { setUser, setToken } = useAuthStore()
 
-  const generateUsername = () => {
-    const adjectives = [
-      'Cool',
-      'Epic',
-      'Swift',
-      'Brave',
-      'Mystic',
-      'Cyber',
-      'Ninja',
-      'Phantom',
-    ]
-    const nouns = [
-      'Gamer',
-      'Warrior',
-      'Explorer',
-      'Hunter',
-      'Wizard',
-      'Knight',
-      'Rebel',
-      'Hero',
-    ]
-    const number = Math.floor(Math.random() * 1000)
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (state.isAuthenticated) {
+      window.location.href = '/'
+    }
+  }, [state.isAuthenticated])
 
-    return `${adjectives[Math.floor(Math.random() * adjectives.length)]}${
-      nouns[Math.floor(Math.random() * nouns.length)]
-    }${number}`
-  }
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    if (!username.trim()) {
+      toast.error('Please enter a username')
+      return
+    }
 
-  const handleLogin = async () => {
-    setIsLoading(true)
+    if (username.trim().length < 2) {
+      toast.error('Username must be at least 2 characters long')
+      return
+    }
+
+    if (username.trim().length > 20) {
+      toast.error('Username must be less than 20 characters')
+      return
+    }
+
     try {
-      const response = await authApi.setupUser()
-      const { userId, username, avatar, token, xp, level } = response.data
-      setUser({
-        id: userId,
-        username,
-        avatar,
-        xp,
-        level,
-        badges: [],
-        createdAt: new Date().toISOString(),
-      })
-      setToken(token)
-
-      toast.success(`Welcome, ${username}!`, {
-        description: "You're ready to start chatting and earning XP!",
-      })
-
-      navigate('/chats')
-    } catch (error) {
-      console.error('Login failed:', error)
-      toast.error('Failed to create user. Please try again.')
+      setIsLoading(true)
+      await setupUser(username.trim(), selectedAvatar)
+      toast.success('Welcome to Anonymous Chat!')
+      window.location.href = '/'
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to setup user')
     } finally {
       setIsLoading(false)
     }
   }
 
-  return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <div className="w-full max-w-md space-y-8">
-        {/* Hero Section */}
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center space-y-4"
-        >
-          <motion.div
-            animate={{
-              rotate: [0, 10, -10, 0],
-              scale: [1, 1.1, 1],
-            }}
-            transition={{
-              duration: 2,
-              repeat: Infinity,
-              repeatDelay: 3,
-            }}
-          >
-            <div className="w-20 h-20 bg-gradient-to-br from-primary to-primary-glow rounded-2xl mx-auto flex items-center justify-center chat-glow">
-              <MessageCircle className="h-10 w-10 text-primary-foreground" />
-            </div>
-          </motion.div>
+  const generateRandomUsername = () => {
+    const adjectives = ['Cool', 'Smart', 'Funny', 'Brave', 'Kind', 'Wise', 'Swift', 'Bright']
+    const nouns = ['User', 'Chatter', 'Friend', 'Buddy', 'Pal', 'Mate', 'Comrade', 'Hero']
+    const adjective = adjectives[Math.floor(Math.random() * adjectives.length)]
+    const noun = nouns[Math.floor(Math.random() * nouns.length)]
+    const number = Math.floor(Math.random() * 1000)
+    return `${adjective}${noun}${number}`
+  }
 
-          <div>
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-              Anonymous Chat
-            </h1>
-            <p className="text-muted-foreground mt-2">
-              Connect, chat, and level up with gamified messaging
+  const handleRandomUsername = () => {
+    setUsername(generateRandomUsername())
+  }
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 to-secondary/5 p-4">
+      <Card className="w-full max-w-md p-8">
+        <div className="text-center mb-8">
+          <div className="text-6xl mb-4">💬</div>
+          <h1 className="text-3xl font-bold mb-2">Anonymous Chat</h1>
+          <p className="text-muted-foreground">
+            Join the conversation anonymously and start chatting!
+          </p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Username Input */}
+          <div className="space-y-2">
+            <label htmlFor="username" className="text-sm font-medium">
+              Choose your username
+            </label>
+            <div className="flex space-x-2">
+              <Input
+                id="username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="Enter your username"
+                maxLength={20}
+                disabled={isLoading}
+                className="flex-1"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleRandomUsername}
+                disabled={isLoading}
+                className="px-3"
+              >
+                🎲
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {username.length}/20 characters
             </p>
           </div>
-        </motion.div>
+
+          {/* Avatar Selection */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Choose your avatar</label>
+            <div className="grid grid-cols-6 gap-2">
+              {AVATARS.map((avatar) => (
+                <button
+                  key={avatar}
+                  type="button"
+                  onClick={() => setSelectedAvatar(avatar)}
+                  disabled={isLoading}
+                  className={`
+                    w-12 h-12 text-2xl rounded-lg border-2 transition-all
+                    ${selectedAvatar === avatar
+                      ? 'border-primary bg-primary/10 scale-110'
+                      : 'border-border hover:border-primary/50 hover:bg-primary/5'
+                    }
+                    disabled:opacity-50 disabled:cursor-not-allowed
+                  `}
+                >
+                  {avatar}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Preview */}
+          <div className="bg-muted/50 rounded-lg p-4 text-center">
+            <div className="text-3xl mb-2">{selectedAvatar}</div>
+            <p className="font-medium">
+              {username || 'Your username will appear here'}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              This is how others will see you
+            </p>
+          </div>
+
+          {/* Submit Button */}
+          <Button
+            type="submit"
+            className="w-full"
+            disabled={isLoading || !username.trim()}
+          >
+            {isLoading ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                Setting up...
+              </>
+            ) : (
+              'Start Chatting'
+            )}
+          </Button>
+        </form>
 
         {/* Features */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.2 }}
-          className="grid grid-cols-3 gap-4"
-        >
-          <div className="text-center space-y-2">
-            <div className="w-12 h-12 bg-card rounded-xl mx-auto flex items-center justify-center">
-              <Users className="h-6 w-6 text-accent" />
+        <div className="mt-8 pt-6 border-t">
+          <h3 className="text-sm font-medium mb-3">Features</h3>
+          <div className="grid grid-cols-2 gap-3 text-xs text-muted-foreground">
+            <div className="flex items-center space-x-2">
+              <span>💬</span>
+              <span>Real-time messaging</span>
             </div>
-            <p className="text-xs text-muted-foreground">Anonymous</p>
-          </div>
-
-          <div className="text-center space-y-2">
-            <div className="w-12 h-12 bg-card rounded-xl mx-auto flex items-center justify-center">
-              <Sparkles className="h-6 w-6 text-xp-gold" />
+            <div className="flex items-center space-x-2">
+              <span>🎯</span>
+              <span>XP & Levels</span>
             </div>
-            <p className="text-xs text-muted-foreground">Earn XP</p>
-          </div>
-
-          <div className="text-center space-y-2">
-            <div className="w-12 h-12 bg-card rounded-xl mx-auto flex items-center justify-center">
-              <Gamepad2 className="h-6 w-6 text-success" />
+            <div className="flex items-center space-x-2">
+              <span>😀</span>
+              <span>Reactions</span>
             </div>
-            <p className="text-xs text-muted-foreground">Leaderboard</p>
+            <div className="flex items-center space-x-2">
+              <span>🏆</span>
+              <span>Leaderboard</span>
+            </div>
           </div>
-        </motion.div>
-
-        {/* Login Card */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-        >
-          <Card className="chat-glow">
-            <CardHeader className="text-center">
-              <CardTitle className="flex items-center gap-2 justify-center">
-                <Avatar className="h-8 w-8">
-                  <AvatarFallback className="bg-primary text-primary-foreground">
-                    {generateUsername()[0]}
-                  </AvatarFallback>
-                </Avatar>
-                Get Started
-              </CardTitle>
-              <CardDescription>
-                Jump right into anonymous chatting with auto-generated profile
-              </CardDescription>
-            </CardHeader>
-
-            <CardContent className="space-y-4">
-              <div className="text-center space-y-2">
-                <p className="text-sm text-muted-foreground">
-                  Your anonymous identity:
-                </p>
-                <div className="bg-muted/50 rounded-lg p-3">
-                  <p className="font-medium text-foreground">
-                    {generateUsername()}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Auto-generated • Private • Secure
-                  </p>
-                </div>
-              </div>
-
-              <Button
-                onClick={handleLogin}
-                disabled={isLoading}
-                size="lg"
-                className="w-full bg-gradient-to-r from-primary to-primary-glow hover:from-primary-glow hover:to-primary"
-              >
-                {isLoading ? (
-                  <motion.div
-                    animate={{ rotate: 360 }}
-                    transition={{
-                      duration: 1,
-                      repeat: Infinity,
-                      ease: 'linear',
-                    }}
-                  >
-                    <Sparkles className="h-4 w-4" />
-                  </motion.div>
-                ) : (
-                  <>
-                    <MessageCircle className="h-4 w-4 mr-2" />
-                    Start Chatting
-                  </>
-                )}
-              </Button>
-
-              <p className="text-xs text-center text-muted-foreground">
-                No registration required • Start earning XP immediately
-              </p>
-            </CardContent>
-          </Card>
-        </motion.div>
-      </div>
+        </div>
+      </Card>
     </div>
   )
 }
-
-export default LoginPage

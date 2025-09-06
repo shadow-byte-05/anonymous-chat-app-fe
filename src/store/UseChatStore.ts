@@ -2,12 +2,13 @@ import { create } from 'zustand'
 
 interface Message {
   id: string
-  userId: string
-  username: string
-  avatar: string
-  content: string
+  senderID: string
+  senderUsername: string
+  senderAvatar: string
+  encryptedContent: string
   timestamp: string
   reactions: { [emoji: string]: string[] }
+  replyToMessageID?: string
 }
 
 interface ChatGroup {

@@ -22,7 +22,15 @@ export const ReactionBar: React.FC<ReactionBarProps> = ({
 }) => {
   const [isOpen, setIsOpen] = useState(false)
 
-  const hasReactions = Object.keys(reactions).length > 0
+  const safeReactions = reactions || {}
+  const getCount = (value: any): number => {
+    if (Array.isArray(value)) return value.length
+    if (value && typeof value === 'object') return Object.keys(value).length
+    if (typeof value === 'number') return value
+    return 0
+  }
+  const entries = Object.entries(safeReactions).filter(([, v]) => getCount(v) > 0)
+  const hasReactions = entries.length > 0
 
   return (
     <div className="flex items-center gap-1 mt-2">
@@ -34,7 +42,7 @@ export const ReactionBar: React.FC<ReactionBarProps> = ({
             exit={{ opacity: 0, scale: 0.8 }}
             className="flex gap-1 flex-wrap"
           >
-            {Object.entries(reactions).map(([emoji, users]) => (
+            {entries.map(([emoji, users]) => (
               <Badge
                 key={emoji}
                 variant="secondary"
@@ -42,7 +50,7 @@ export const ReactionBar: React.FC<ReactionBarProps> = ({
                 onClick={() => onReaction(emoji)}
               >
                 <span className="mr-1">{emoji}</span>
-                {users.length}
+                {getCount(users)}
               </Badge>
             ))}
           </motion.div>

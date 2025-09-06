@@ -13,11 +13,16 @@ interface XPBarProps {
 export const XPBar: React.FC<XPBarProps> = ({
   currentXP,
   level,
-  maxXP = 1000,
+  maxXP = 100,
   className = '',
 }) => {
-  const progress = (currentXP % maxXP) / maxXP
-  const nextLevelXP = maxXP - (currentXP % maxXP)
+  const parsedMax = Number(maxXP)
+  const parsedXP = Number(currentXP)
+  const numericMax = Number.isFinite(parsedMax) && parsedMax > 0 ? parsedMax : 100
+  const numericXP = Number.isFinite(parsedXP) ? parsedXP : 0
+  const remainder = ((numericXP % numericMax) + numericMax) % numericMax
+  const progress = Math.max(0, Math.min(1, remainder / numericMax))
+  const nextLevelXP = Math.max(0, Math.round(numericMax - remainder))
 
   return (
     <div className={`space-y-2 ${className}`}>
@@ -36,11 +41,12 @@ export const XPBar: React.FC<XPBarProps> = ({
         </span>
       </div>
 
-      <div className="xp-bar">
+      <div className="xp-bar w-full">
         <motion.div
           className="xp-fill"
           initial={{ width: 0 }}
           animate={{ width: `${progress * 100}%` }}
+          style={{ width: `${progress * 100}%` }}
           transition={{ duration: 0.8, ease: 'easeOut' }}
         />
       </div>

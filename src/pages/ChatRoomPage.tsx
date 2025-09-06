@@ -1,133 +1,64 @@
-import React, { useEffect, useState, useRef } from 'react'
+import React, { useEffect, useState, useRef, useCallback } from 'react'
 import { motion } from 'motion/react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
-import { Badge } from '@/components/ui/badge'
 import { ArrowLeft, Send, Users, Trophy } from 'lucide-react'
 import { MessageBubble } from '@/components/chat/MessageBubble'
 import { TypingIndicator } from '@/components/chat/TypingIndicator'
 import { XPBar } from '@/components/gamification/XPBar'
-import { chatApi } from '@/utils/api'
-import { socketService } from '@/utils/socket'
-import { useChatStore } from '@/store/UseChatStore'
-import { useAuthStore } from '@/store/UseAuthStore'
-import { toast } from 'sonner'
+import { useChat } from '@/contexts/ChatContext'
 
 export const ChatRoomPage: React.FC = () => {
   const { chatId } = useParams<{ chatId: string }>()
   const navigate = useNavigate()
-  const { user, setUser } = useAuthStore()
-  const {
-    messages,
-    typingUsers,
-    setMessages,
-    addMessage,
-    updateMessage,
-    setTypingUsers,
-  } = useChatStore()
+  const { state, joinChatGroup, sendMessage, addReaction, sendTyping } = useChat()
 
   const [messageText, setMessageText] = useState('')
-  const [isLoading, setIsLoading] = useState(true)
   const [isTyping, setIsTyping] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const typingTimeoutRef = useRef<NodeJS.Timeout>()
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
-    if (!chatId || !user) {
+    if (!chatId || !state.isAuthenticated) {
       navigate('/')
       return
     }
 
-    loadMessages()
-    setupSocket()
+    joinChatGroup(chatId)
 
     return () => {
-      socketService.sendTyping(chatId, false)
+      if (state.currentChatGroup) {
+        sendTyping(false)
+      }
     }
-  }, [chatId, user])
+  }, [chatId, state.isAuthenticated])
 
   useEffect(() => {
     scrollToBottom()
-  }, [messages])
+  }, [state.messages])
 
-  const loadMessages = async () => {
-    if (!chatId) return
-
-    try {
-      const response = await chatApi.getChatMessages(chatId)
-      setMessages(response.data)
-    } catch (error) {
-      console.error('Failed to load messages:', error)
-      toast.error('Failed to load chat messages')
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const setupSocket = () => {
-    if (!user || !chatId) return
-
-    const socket = socketService.connect(user.id)
-    socketService.joinChat(chatId)
-
-    // Listen for new messages
-    socketService.onMessage((message) => {
-      addMessage(message)
-    })
-
-    // Listen for reactions
-    socketService.onReaction((data) => {
-      updateMessage(data.messageId, { reactions: data.reactions })
-    })
-
-    // Listen for typing
-    socketService.onTyping((data) => {
-      if (data.userId !== user.id) {
-        setTypingUsers(
-          data.typingUsers.filter((u: string) => u !== user.username)
-        )
-      }
-    })
-
-    // Listen for XP updates
-    socketService.onXPUpdate((data) => {
-      if (data.userId === user.id) {
-        setUser({ ...user, xp: data.xp, level: data.level })
-        toast.success(`+${data.xpGained} XP`, {
-          description: `Total: ${data.xp} XP`,
-          duration: 2000,
-        })
-      }
-    })
-  }
+  // Messages are loaded via context when joining group
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }
 
-  const handleSendMessage = () => {
-    if (!messageText.trim() || !chatId) return
-
-    socketService.sendMessage(chatId, messageText)
+  const handleSendMessage = useCallback(() => {
+    if (!messageText.trim()) return
+    sendMessage(messageText)
     setMessageText('')
-
-    // Stop typing indicator
     if (isTyping) {
-      socketService.sendTyping(chatId, false)
+      sendTyping(false)
       setIsTyping(false)
     }
-  }
+  }, [messageText, isTyping, sendMessage, sendTyping])
 
   const handleTyping = (value: string) => {
     setMessageText(value)
-
-    if (!chatId) return
-
     if (value && !isTyping) {
       setIsTyping(true)
-      socketService.sendTyping(chatId, true)
+      sendTyping(true)
     }
 
     // Clear existing timeout
@@ -138,14 +69,14 @@ export const ChatRoomPage: React.FC = () => {
     // Set new timeout to stop typing
     typingTimeoutRef.current = setTimeout(() => {
       if (isTyping) {
-        socketService.sendTyping(chatId, false)
+        sendTyping(false)
         setIsTyping(false)
       }
     }, 2000)
   }
 
   const handleReaction = (messageId: string, emoji: string) => {
-    socketService.addReaction(messageId, emoji)
+    addReaction(messageId, emoji)
   }
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -155,7 +86,7 @@ export const ChatRoomPage: React.FC = () => {
     }
   }
 
-  if (!user) {
+  if (!state.user) {
     navigate('/')
     return null
   }
@@ -176,7 +107,7 @@ export const ChatRoomPage: React.FC = () => {
             <div>
               <h1 className="font-semibold text-foreground">Chat Room</h1>
               <p className="text-xs text-muted-foreground">
-                {messages.length} messages
+                {state.messages.length} messages
               </p>
             </div>
           </div>
@@ -197,19 +128,19 @@ export const ChatRoomPage: React.FC = () => {
 
       {/* XP Progress Bar */}
       <div className="bg-card/50 px-4 py-2 border-b border-border/50">
-        <XPBar currentXP={user.xp} level={user.level} />
+        <XPBar currentXP={(state.user?.points as number) || 0} level={(state.user?.level as number) || 1} />
       </div>
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-1">
-        {isLoading ? (
+        {state.isLoading ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center space-y-2">
               <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full mx-auto" />
               <p className="text-muted-foreground">Loading messages...</p>
             </div>
           </div>
-        ) : messages.length === 0 ? (
+        ) : state.messages.length === 0 ? (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -231,15 +162,15 @@ export const ChatRoomPage: React.FC = () => {
           </motion.div>
         ) : (
           <>
-            {messages.map((message) => (
+            {state.messages.map((message) => (
               <MessageBubble
                 key={message.id}
                 message={message}
-                isOwn={message.userId === user.id}
+                isOwn={message.senderID === state.user!.userID}
                 onReaction={handleReaction}
               />
             ))}
-            <TypingIndicator typingUsers={typingUsers} />
+            <TypingIndicator typingUsers={state.typingUsers.map(u => u.username)} />
             <div ref={messagesEndRef} />
           </>
         )}

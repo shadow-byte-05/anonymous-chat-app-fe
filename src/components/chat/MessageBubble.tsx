@@ -5,12 +5,13 @@ import { ReactionBar } from './ReactionBar.tsx'
 
 interface Message {
   id: string
-  userId: string
-  username: string
-  avatar: string
-  content: string
+  senderID: string
+  senderUsername: string
+  senderAvatar: string
+  encryptedContent: string
   timestamp: string
   reactions: { [emoji: string]: string[] }
+  replyToMessageID?: string
 }
 
 interface MessageBubbleProps {
@@ -39,9 +40,9 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     >
       {!isOwn && (
         <Avatar className="h-8 w-8 ring-2 ring-border">
-          <AvatarImage src={message.avatar} alt={message.username} />
+          <AvatarImage src={message.senderAvatar} alt={message.senderUsername} />
           <AvatarFallback className="bg-primary text-primary-foreground text-sm">
-            {message.username[0]?.toUpperCase()}
+            {message.senderUsername[0]?.toUpperCase()}
           </AvatarFallback>
         </Avatar>
       )}
@@ -50,7 +51,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
         {!isOwn && (
           <div className="flex items-center gap-2 mb-1">
             <span className="text-sm font-medium text-foreground">
-              {message.username}
+              {message.senderUsername}
             </span>
             <span className="text-xs text-muted-foreground">
               {formatTime(message.timestamp)}
@@ -63,7 +64,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             isOwn ? 'message-bubble-own' : 'message-bubble-other'
           }`}
         >
-          <p className="text-sm leading-relaxed">{message.content}</p>
+          <p className="text-sm leading-relaxed">{message.encryptedContent}</p>
 
           {isOwn && (
             <div className="text-xs text-primary-foreground/70 mt-1 text-right">

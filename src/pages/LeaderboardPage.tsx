@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
@@ -13,8 +14,7 @@ import { Badge } from '@/components/ui/badge'
 import { ArrowLeft, Trophy, Crown, Medal, Star, Zap } from 'lucide-react'
 import { LeaderboardCard } from '@/components/gamification/LeaderboardCard'
 import { XPBar } from '@/components/gamification/XPBar'
-import { authApi } from '@/utils/api'
-import { useAuthStore } from '@/store/UseAuthStore'
+import { useChat } from '@/contexts/ChatContext'
 import { toast } from 'sonner'
 
 interface LeaderboardUser {
@@ -30,27 +30,42 @@ export const LeaderboardPage: React.FC = () => {
   const [leaderboard, setLeaderboard] = useState<LeaderboardUser[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const navigate = useNavigate()
-  const { user } = useAuthStore()
+  const { state, loadLeaderboard } = useChat()
 
   useEffect(() => {
-    loadLeaderboard()
+    ;(async () => {
+      try {
+        await loadLeaderboard()
+      } catch (e) {
+        // handled in context
+      } finally {
+        setIsLoading(false)
+      }
+    })()
   }, [])
 
-  const loadLeaderboard = async () => {
+  useEffect(() => {
     try {
-      const response = await authApi.getLeaderboard()
-      setLeaderboard(response.data)
+      const mapped = (state.leaderboard || []).map((u, index) => ({
+        id: (u as any).userID ?? (u as any).id ?? u.username,
+        username: u.username,
+        avatar: (u as any).avatar ?? '🎯',
+        xp: (u as any).points ?? (u as any).xp ?? 0,
+        level: (u as any).level ?? 1,
+        rank: index + 1,
+      }))
+      setLeaderboard(mapped)
     } catch (error) {
-      console.error('Failed to load leaderboard:', error)
-      toast.error('Failed to load leaderboard')
-    } finally {
-      setIsLoading(false)
+      console.error('Failed to map leaderboard:', error)
+      toast.error('Failed to map leaderboard')
     }
-  }
+  }, [state.leaderboard])
 
   const getUserRank = () => {
-    if (!user) return null
-    return leaderboard.find((u) => u.id === user.id)?.rank || null
+    if (!state.user) return null
+    return (
+      leaderboard.find((u) => u.id === state.user?.userID || u.username === state.user?.username)?.rank || null
+    )
   }
 
   const topThree = leaderboard.slice(0, 3)
@@ -88,7 +103,7 @@ export const LeaderboardPage: React.FC = () => {
 
       <div className="max-w-4xl mx-auto p-4 space-y-6">
         {/* Your Progress */}
-        {user && (
+        {state.user && (
           <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -106,7 +121,7 @@ export const LeaderboardPage: React.FC = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <XPBar currentXP={user.xp} level={user.level} />
+                <XPBar currentXP={(state.user.points as any) || 0} level={(state.user.level as any) || 1} />
               </CardContent>
             </Card>
           </motion.div>

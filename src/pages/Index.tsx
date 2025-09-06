@@ -1,19 +1,19 @@
 import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useAuthStore } from '@/store/UseAuthStore'
+import { useChat } from '@/contexts/ChatContext'
 
 const Index = () => {
   const navigate = useNavigate()
-  const { isAuthenticated } = useAuthStore()
+  const { state } = useChat()
 
   useEffect(() => {
     // Redirect based on authentication status
-    if (isAuthenticated) {
+    if (state.isAuthenticated) {
       navigate('/chats')
     } else {
       navigate('/login')
     }
-  }, [isAuthenticated, navigate])
+  }, [state.isAuthenticated, navigate])
 
   // Loading state while redirecting
   return (

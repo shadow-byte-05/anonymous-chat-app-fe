@@ -1,143 +1,158 @@
-// Mock API data
-const mockUsers = [
-  { id: '1', username: 'ChatMaster', avatar: '👑', xp: 2500, level: 5 },
-  { id: '2', username: 'QuickWit', avatar: '⚡', xp: 1800, level: 4 },
-  { id: '3', username: 'CodeNinja', avatar: '🥷', xp: 1200, level: 3 },
-  { id: '4', username: 'ByteBuster', avatar: '🚀', xp: 800, level: 2 },
-]
+import axios, { AxiosInstance, AxiosResponse } from 'axios'
+import { config } from '../config/environment'
 
-const mockChatGroups = [
-  {
-    id: 'general',
-    name: 'General Chat',
-    description: 'Talk about anything and everything',
-    memberCount: 45,
-    isActive: true,
-  },
-  {
-    id: 'tech',
-    name: 'Tech Talk',
-    description: 'Discuss the latest in technology',
-    memberCount: 28,
-    isActive: true,
-  },
-  {
-    id: 'random',
-    name: 'Random',
-    description: 'Random conversations and fun topics',
-    memberCount: 32,
-    isActive: false,
-  },
-  {
-    id: 'gaming',
-    name: 'Gaming Zone',
-    description: 'Share your gaming experiences',
-    memberCount: 19,
-    isActive: true,
-  },
-]
-
-const mockMessages: { [key: string]: any[] } = {
-  general: [
-    {
-      id: '1',
-      userId: '1',
-      username: 'ChatMaster',
-      avatar: '👑',
-      content: 'Welcome to the general chat!',
-      timestamp: new Date(Date.now() - 300000).toISOString(),
-      reactions: { '👍': ['2', '3'], '🔥': ['4'] },
-    },
-    {
-      id: '2',
-      userId: '2',
-      username: 'QuickWit',
-      avatar: '⚡',
-      content: 'Thanks! Excited to be here',
-      timestamp: new Date(Date.now() - 240000).toISOString(),
-      reactions: {},
-    },
-    {
-      id: '3',
-      userId: '3',
-      username: 'CodeNinja',
-      avatar: '🥷',
-      content: 'This chat app looks amazing!',
-      timestamp: new Date(Date.now() - 180000).toISOString(),
-      reactions: { '💯': ['1', '2'] },
-    },
-  ],
-  tech: [
-    {
-      id: '4',
-      userId: '4',
-      username: 'ByteBuster',
-      avatar: '🚀',
-      content: 'Anyone working on React projects?',
-      timestamp: new Date(Date.now() - 360000).toISOString(),
-      reactions: { '⚛️': ['1', '3'] },
-    },
-    {
-      id: '5',
-      userId: '1',
-      username: 'ChatMaster',
-      avatar: '👑',
-      content: 'Yes! Building this chat app with React + Vite',
-      timestamp: new Date(Date.now() - 300000).toISOString(),
-      reactions: {},
-    },
-  ],
+// Types
+export interface User {
+  userID: string
+  username: string
+  avatar: string
+  points?: number
+  level?: number
+  badges?: string[]
+  createdAt?: string
 }
 
-// Mock API functions
-export const authApi = {
-  setupUser: async () => {
-    await new Promise((resolve) => setTimeout(resolve, 500)) // Simulate network delay
-    const userId = Math.random().toString(36).substr(2, 9)
-    const username = `User${Math.floor(Math.random() * 1000)}`
-    const avatars = ['😄', '🚀', '🌟', '🎉', '💫', '🔥', '⚡', '🎯']
-    const avatar = avatars[Math.floor(Math.random() * avatars.length)]
+export interface ChatGroup {
+  groupID: string
+  name: string
+  description: string
+  type: string
+  createdByUserID: string
+  createdAt: string
+  memberCount?: number
+  isActive?: boolean
+}
 
-    return {
-      success: true,
-      data: {
-        userId,
-        username,
-        avatar,
-        token: `mock-token-${userId}`,
-        xp: 0,
-        level: 1,
-      },
+export interface Message {
+  id: string
+  senderID: string
+  senderUsername: string
+  senderAvatar: string
+  encryptedContent: string
+  timestamp: string
+  reactions: { [emoji: string]: string[] }
+  replyToMessageID?: string
+}
+
+export interface ApiResponse<T> {
+  success: boolean
+  message?: string
+  data: T
+}
+
+// Axios instance configuration
+const createApiInstance = (): AxiosInstance => {
+  const instance = axios.create({
+    baseURL: config.api.baseURL,
+    timeout: config.api.timeout,
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  })
+
+  // Request interceptor for adding auth token
+  instance.interceptors.request.use(
+    (config) => {
+      const token = localStorage.getItem('auth-token')
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`
+      }
+      return config
+    },
+    (error) => {
+      return Promise.reject(error)
+    }
+  )
+
+  // Response interceptor for error handling
+  instance.interceptors.response.use(
+    (response: AxiosResponse) => {
+      return response
+    },
+    (error) => {
+      if (error.response?.status === 401) {
+        // Handle unauthorized access
+        localStorage.removeItem('auth-token')
+        localStorage.removeItem('auth-storage')
+        window.location.href = '/login'
+      }
+      return Promise.reject(error)
+    }
+  )
+
+  return instance
+}
+
+const api = createApiInstance()
+
+// User API functions
+export const userApi = {
+  setupUser: async (username: string, avatar?: string): Promise<ApiResponse<{ userID: string; username: string; avatar: string }>> => {
+    try {
+      const response = await api.post('/users/setup', { username, avatar })
+      return response.data
+    } catch (error: any) {
+      throw new Error(error.response?.data?.message || 'Failed to setup user')
     }
   },
 
-  getLeaderboard: async () => {
-    await new Promise((resolve) => setTimeout(resolve, 300))
-    const usersWithRanks = mockUsers
-      .sort((a, b) => b.xp - a.xp)
-      .map((user, index) => ({ ...user, rank: index + 1 }))
+  getUserProfile: async (userID: string): Promise<ApiResponse<User>> => {
+    try {
+      const response = await api.get(`/users/${userID}`)
+      return response.data
+    } catch (error: any) {
+      throw new Error(error.response?.data?.message || 'Failed to get user profile')
+    }
+  },
 
-    return {
-      success: true,
-      data: usersWithRanks,
+  getLeaderboard: async (): Promise<ApiResponse<User[]>> => {
+    try {
+      const response = await api.get('/users/leaderboard')
+      return response.data
+    } catch (error: any) {
+      throw new Error(error.response?.data?.message || 'Failed to get leaderboard')
     }
   },
 }
 
+// Chat API functions
 export const chatApi = {
-  getChatGroups: async () => {
-    await new Promise((resolve) => setTimeout(resolve, 300))
-    return {
-      success: true,
-      data: mockChatGroups,
+  createChatGroup: async (name: string, description: string, type: string, createdByUserID: string): Promise<ApiResponse<ChatGroup>> => {
+    try {
+      const response = await api.post('/chats', { name, description, type, createdByUserID })
+      return response.data
+    } catch (error: any) {
+      throw new Error(error.response?.data?.message || 'Failed to create chat group')
     }
   },
 
-  getChatMessages: async (groupId: string) => {
-    await new Promise((resolve) => setTimeout(resolve, 200))
-    return {
-      success: true,
-      data: mockMessages[groupId] || [],
+  getAllChatGroups: async (): Promise<ApiResponse<ChatGroup[]>> => {
+    try {
+      const response = await api.get('/chats')
+      return response.data
+    } catch (error: any) {
+      throw new Error(error.response?.data?.message || 'Failed to get chat groups')
+    }
+  },
+
+  getChatGroupDetails: async (groupID: string): Promise<ApiResponse<ChatGroup>> => {
+    try {
+      const response = await api.get(`/chats/${groupID}`)
+      return response.data
+    } catch (error: any) {
+      throw new Error(error.response?.data?.message || 'Failed to get chat group details')
+    }
+  },
+
+  getGroupMessages: async (groupID: string, limit: number = 50): Promise<ApiResponse<Message[]>> => {
+    try {
+      const response = await api.get(`/chats/${groupID}/messages`, { params: { limit } })
+      return response.data
+    } catch (error: any) {
+      throw new Error(error.response?.data?.message || 'Failed to get group messages')
     }
   },
 }
+
+// Export the main API instance for custom requests
+export { api }
